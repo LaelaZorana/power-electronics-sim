@@ -1,17 +1,18 @@
-"""Generate every figure in figures/. Run: python examples/run_all.py"""
-import os, sys
+"""Generate every figure in figures/. Run: python examples/run_all.py
+
+Needs pesim installed, pip install -e . from the repo root."""
+import os
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from pesim.converters import ConverterSpec, simulate
 from pesim.design import (buck_small_signal, boost_small_signal, design_type3,
                           design_type2, phase_deg, ccm_boundary_load, boost_rhp_zero)
 from pesim.inverter import spwm, svpwm, line_line, spectrum, thd, fundamental
 from pesim.pfc import boost_pfc
-from pesim.thermal import MosfetParams, junction_temperature
+from pesim.thermal import MosfetParams, mosfet_losses, junction_temperature
 
 FIG = os.path.join(os.path.dirname(__file__), "..", "figures")
 os.makedirs(FIG, exist_ok=True)
@@ -34,24 +35,35 @@ def buck_ccm_dcm():
 
 
 def boost_efficiency():
+    # switched sim gives conduction and diode losses, switching loss is added
+    # from mosfet_losses fed with the simulated switch currents, so the curve
+    # has the real shape: switching dominated at light load, conduction at heavy
+    mos = MosfetParams(Rds_on_25=30e-3, Qg=40e-9, Qgd=8e-9, Qgs=7e-9, Qoss=60e-9,
+                       Qrr=50e-9, Rth_jc=0.6, Rth_ca=8.0)
     loads = np.logspace(np.log10(3), np.log10(200), 25)
-    eta, mode = [], []
+    eta, mode, Pout = [], [], []
     for R in loads:
         spec = ConverterSpec("boost", Vin=12, D=0.5, fs=100e3, L=100e-6, C=100e-6, R=R,
                              Rds_on=0.03, R_L=0.02, V_f=0.5, ESR=0.05)
         r = simulate(spec, n_periods=6)
-        eta.append(r.efficiency); mode.append(r.mode)
-    Pout = 24 ** 2 / loads
+        s = r.last_periods(5)
+        on = r.sw[s] == 1
+        i_on = float(r.iL[s][on][0]) if on.any() else 0.0    # current at turn on
+        i_off = float(r.iL[s][on][-1]) if on.any() else 0.0  # current at turn off
+        lm = mosfet_losses(mos, 0.0, i_on, i_off, Vds=r.Vout_avg, fsw=spec.fs)
+        P_sw = lm["switching"] + lm["coss"] + lm["reverse_recovery"]
+        eta.append(r.Pout / (r.Pin + P_sw)); mode.append(r.mode); Pout.append(r.Pout)
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.semilogx(Pout, np.array(eta) * 100, "o-")
     for p, m, e in zip(Pout, mode, eta):
         if m == "DCM":
             ax.plot(p, e * 100, "rs", ms=4)
-    ax.set_xlabel("Pout (W)"); ax.set_ylabel("efficiency (%)")
-    ax.set_title("Boost 12 to 24 V, Rds_on 30 mohm, DCR 20 mohm, Vf 0.5 V, ESR 50 mohm (red = DCM)")
+    ax.set_xlabel("Pout (W), from the simulated output voltage"); ax.set_ylabel("efficiency (%)")
+    ax.set_title("Boost 12 to 24 V, conduction plus switching loss, red = DCM")
     ax.grid(True, which="both", alpha=0.3)
     fig.tight_layout(); fig.savefig(os.path.join(FIG, "boost_efficiency_vs_load.png"), dpi=130); plt.close(fig)
     summary["boost_eta_max"] = max(eta)
+    summary["boost_eta_peak_Pout"] = Pout[int(np.argmax(eta))]
 
 
 def control_bode():
@@ -88,10 +100,10 @@ def inverter_figs():
     f, a = spectrum(vll, w["t"], 50, n_harm=140)
     ax[2].stem(f, a, basefmt=" ", markerfmt=" ")
     ax[2].set_xlabel("f (Hz)"); ax[2].set_ylabel("|Vab| peak (V)")
-    ax[2].set_title(f"Line-line spectrum: fundamental {a[1]:.1f} V (theory {np.sqrt(3)*m*Vdc/2:.1f} V), THD {100*thd(vll, w['t'], 50):.0f} %")
+    ax[2].set_title(f"Line-line spectrum: fundamental {a[1]:.1f} V, theory {np.sqrt(3)*m*Vdc/2:.1f} V, unfiltered voltage THD {100*thd(vll, w['t'], 50):.0f} %")
     fig.tight_layout(); fig.savefig(os.path.join(FIG, "inverter_waveforms_fft.png"), dpi=130); plt.close(fig)
     summary["spwm_Vll1"] = a[1]
-    ms = np.linspace(0.1, 1.4, 27)
+    ms = np.linspace(0.1, 1.155, 27)  # sweep stops at the SVPWM linear limit
     v_sp, v_sv, thd_sp, thd_sv = [], [], [], []
     for mi in ms:
         for gen, V, T in [(spwm, v_sp, thd_sp), (svpwm, v_sv, thd_sv)]:
@@ -100,12 +112,12 @@ def inverter_figs():
             V.append(fundamental(x, ww["t"], 50) / Vdc); T.append(100 * thd(x, ww["t"], 50))
     fig, ax = plt.subplots(1, 2, figsize=(10, 4))
     ax[0].plot(ms, v_sp, label="SPWM"); ax[0].plot(ms, v_sv, label="SVPWM (min-max injection)")
-    ax[0].axhline(np.sqrt(3) / 2, ls="--", color="gray", label="sqrt(3)/2 = 0.866")
-    ax[0].axhline(1.0, ls=":", color="gray", label="1.0 (SVPWM limit)")
+    ax[0].axhline(np.sqrt(3) / 2, ls="--", color="gray", label="0.866, SPWM linear limit")
+    ax[0].axhline(1.0, ls=":", color="gray", label="1.0, SVPWM linear limit")
     ax[0].set_xlabel("modulation index m"); ax[0].set_ylabel("Vll,1 peak / Vdc"); ax[0].legend(); ax[0].grid(alpha=0.3)
     ax[0].set_title("DC bus utilisation")
     ax[1].plot(ms, thd_sp, label="SPWM"); ax[1].plot(ms, thd_sv, label="SVPWM")
-    ax[1].set_xlabel("m"); ax[1].set_ylabel("line-line THD (%)"); ax[1].legend(); ax[1].grid(alpha=0.3)
+    ax[1].set_xlabel("m"); ax[1].set_ylabel("unfiltered line-line voltage THD (%)"); ax[1].legend(); ax[1].grid(alpha=0.3)
     ax[1].set_title("Harmonic distortion vs m")
     fig.tight_layout(); fig.savefig(os.path.join(FIG, "svpwm_vs_spwm_utilisation.png"), dpi=130); plt.close(fig)
     summary["spwm_max_util"] = max(v_sp); summary["svpwm_max_util"] = max(v_sv)
@@ -130,11 +142,11 @@ def thermal_fig():
     for f in fs:
         r = junction_temperature(p, I_rms=8, I_on=10, I_off=10, Vds=48, fsw=f, T_amb=40)
         Tj.append(r["Tj"]); Pc.append(r["conduction"]); Ps.append(r["switching"] + r["coss"] + r["reverse_recovery"])
-    fig, ax = plt.subplots(figsize=(7, 4))
-    ax.semilogx(fs, Pc, label="conduction"); ax.semilogx(fs, Ps, label="switching + Coss + Qrr")
-    ax2 = ax.twinx(); ax2.semilogx(fs, Tj, "k--", label="Tj"); ax2.set_ylabel("Tj (C)")
-    ax.set_xlabel("fsw (Hz)"); ax.set_ylabel("loss (W)"); ax.legend(loc="upper left"); ax2.legend(loc="upper right")
-    ax.set_title("MOSFET losses and junction temperature vs switching frequency")
+    fig, ax = plt.subplots(2, 1, figsize=(7, 6), sharex=True)
+    ax[0].semilogx(fs, Pc, label="conduction"); ax[0].semilogx(fs, Ps, label="switching + Coss + Qrr")
+    ax[0].set_ylabel("loss (W)"); ax[0].legend(loc="upper left"); ax[0].grid(alpha=0.3)
+    ax[0].set_title("MOSFET losses and junction temperature vs switching frequency")
+    ax[1].semilogx(fs, Tj, "k-"); ax[1].set_ylabel("Tj (C)"); ax[1].set_xlabel("fsw (Hz)"); ax[1].grid(alpha=0.3)
     fig.tight_layout(); fig.savefig(os.path.join(FIG, "mosfet_thermal.png"), dpi=130); plt.close(fig)
     summary["Tj_100k"] = junction_temperature(p, 8, 10, 10, 48, 100e3, 40)["Tj"]
 

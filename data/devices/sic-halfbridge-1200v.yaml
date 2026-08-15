@@ -1,0 +1,25 @@
+name: sic-halfbridge-1200v
+technology: 1200 V silicon carbide half bridge module
+notes: representative of the low mohm 1200 V SiC half bridge module class on a cold plate for traction inverters, per switch values, class typical
+Vds_max: 1200
+rds_on_vs_temp:
+  - [25, 0.0046]
+  - [75, 0.0052]
+  - [100, 0.0056]
+  - [125, 0.0061]
+  - [150, 0.0067]
+# per switch Eon plus Eoff at the reference voltage below
+esw_vs_current:
+  - [10, 0.85e-3]
+  - [25, 2.0e-3]
+  - [50, 3.8e-3]
+  - [100, 7.6e-3]
+  - [200, 16.5e-3]
+  - [300, 27.0e-3]
+  - [400, 39.0e-3]
+V_ref_sw: 800
+Qg: 950.0e-9
+Qoss: 1.6e-6
+Qrr: 1.2e-6
+Rth_jc: 0.15
+Rth_ca: 0.12

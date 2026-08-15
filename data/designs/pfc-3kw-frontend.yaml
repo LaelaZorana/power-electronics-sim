@@ -1,0 +1,10 @@
+name: pfc-3kw-frontend
+kind: pfc
+description: 3 kW totem pole PFC style front end, approximated by the averaged boost PFC model
+device: sic-mosfet-650v
+Vac_rms: 230
+Vout: 400
+Pout: 3000
+fsw: 100.0e+3
+L: 0.5e-3
+C: 940.0e-6

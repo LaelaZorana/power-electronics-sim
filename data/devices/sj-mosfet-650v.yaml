@@ -1,0 +1,24 @@
+name: sj-mosfet-650v
+technology: 650 V silicon superjunction MOSFET
+notes: representative of the 60 mohm 650 V superjunction class in TO-247, values are class typical, not a specific part
+Vds_max: 650
+# [junction temperature C, Rds_on ohm], superjunction roughly doubles by 150 C
+rds_on_vs_temp:
+  - [25, 0.060]
+  - [75, 0.078]
+  - [100, 0.090]
+  - [125, 0.105]
+  - [150, 0.122]
+# [drain current A, Eon plus Eoff J] at the reference voltage below, hard switched
+esw_vs_current:
+  - [2, 22.0e-6]
+  - [5, 38.0e-6]
+  - [10, 68.0e-6]
+  - [15, 105.0e-6]
+  - [20, 148.0e-6]
+V_ref_sw: 400
+Qg: 90.0e-9
+Qoss: 1.1e-6
+Qrr: 8.0e-6
+Rth_jc: 0.6
+Rth_ca: 8.0

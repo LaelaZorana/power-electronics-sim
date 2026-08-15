@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pesim"
+version = "0.2.0"
+description = "Switching power converter simulation and design: buck, boost, buck-boost, three phase inverter, boost PFC, MOSFET losses and thermal"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [{name = "Laela Zorana", email = "zoranalaela9@gmail.com"}]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "matplotlib>=3.9",
+    "control>=0.10",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

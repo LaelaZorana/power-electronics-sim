@@ -1,0 +1,14 @@
+name: buck-48to12-300w
+kind: buck
+description: 48 V to 12 V 300 W intermediate bus buck converter
+device: syncbuck-fet-100v
+Vin: 48
+Vout: 12
+Pout: 300
+fsw: 200.0e+3
+ripple_current_ratio: 0.3
+ripple_voltage_ratio: 0.005
+loop:
+  fc: 20.0e+3
+  pm_target: 60
+  compensator: type3

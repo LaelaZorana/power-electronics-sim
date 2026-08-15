@@ -1,0 +1,24 @@
+name: sic-mosfet-650v
+technology: 650 V silicon carbide MOSFET
+notes: representative of the 50 mohm 650 V SiC class in TO-247-4, flat temperature coefficient and negligible reverse recovery, values are class typical
+Vds_max: 650
+# SiC Rds_on rises only about 1.3x by 150 C
+rds_on_vs_temp:
+  - [25, 0.048]
+  - [75, 0.053]
+  - [100, 0.056]
+  - [125, 0.060]
+  - [150, 0.064]
+# hard switched Eon plus Eoff at the reference voltage, several times below superjunction
+esw_vs_current:
+  - [2, 8.0e-6]
+  - [5, 15.0e-6]
+  - [10, 28.0e-6]
+  - [15, 44.0e-6]
+  - [20, 62.0e-6]
+V_ref_sw: 400
+Qg: 45.0e-9
+Qoss: 120.0e-9
+Qrr: 90.0e-9
+Rth_jc: 0.9
+Rth_ca: 8.0

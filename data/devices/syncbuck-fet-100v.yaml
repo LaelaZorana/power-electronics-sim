@@ -1,0 +1,23 @@
+name: syncbuck-fet-100v
+technology: 100 V synchronous buck power MOSFET
+notes: representative of the low single digit mohm 100 V class in a 5 by 6 mm power package for 48 V intermediate bus converters, values are class typical
+Vds_max: 100
+rds_on_vs_temp:
+  - [25, 0.0024]
+  - [75, 0.0030]
+  - [100, 0.0034]
+  - [125, 0.0038]
+  - [150, 0.0043]
+# Eon plus Eoff at the reference voltage below
+esw_vs_current:
+  - [5, 4.0e-6]
+  - [10, 8.5e-6]
+  - [20, 19.0e-6]
+  - [30, 32.0e-6]
+  - [40, 48.0e-6]
+V_ref_sw: 48
+Qg: 32.0e-9
+Qoss: 55.0e-9
+Qrr: 35.0e-9
+Rth_jc: 1.1
+Rth_ca: 18.0

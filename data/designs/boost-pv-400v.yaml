@@ -1,0 +1,14 @@
+name: boost-pv-400v
+kind: boost
+description: 250 V PV string to 400 V DC link boost, 2 kW
+device: sic-mosfet-650v
+Vin: 250
+Vout: 400
+Pout: 2000
+fsw: 65.0e+3
+ripple_current_ratio: 0.25
+ripple_voltage_ratio: 0.002
+loop:
+  fc_over_rhp_zero: 0.2
+  pm_target: 45
+  compensator: type3

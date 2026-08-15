@@ -1,0 +1,10 @@
+name: inverter-ev-10kw
+kind: inverter
+description: 10 kW EV traction inverter operating point on an 800 V bus, SVPWM
+device: sic-halfbridge-1200v
+Vdc: 800
+Pout: 10000
+fsw: 10.0e+3
+m: 0.9
+f1: 200
+power_factor: 0.9
