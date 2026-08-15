@@ -1,24 +1,24 @@
 # pesim: switching power converter simulation and design
 
-A small Python library for simulating and designing switching converters, three-phase inverters, a boost PFC stage and MOSFET thermal budgets. Everything is plain numpy and scipy plus python-control for the loop design. All results below are produced by `examples/run_all.py` and checked by `tests/`.
+Switching converter simulation has a reputation for needing SPICE, but a buck, a boost, a buck-boost, a three phase inverter, a boost PFC stage and a MOSFET thermal budget all simulate cleanly in plain numpy and scipy, with python-control handling the loop design. Every number below comes out of `examples/run_all.py` and is checked by `tests/`. Nothing is hand copied.
 
 ## Theory summary
 
-Converters (`pesim.converters`). Buck, boost and buck-boost are modelled as switched state-space systems with state x = [iL, vC]. Each converter has three affine sub-circuits (switch on, diode conducting, inductor idle for DCM). Each sub-circuit is discretised exactly with a matrix exponential of the augmented [A b; 0 0] matrix, so the fixed time step only sets how finely the switching instants and DCM boundary are resolved. Loss elements are MOSFET Rds_on, inductor DCR, diode forward drop and capacitor ESR (which also gives the correct ESR ripple step). CCM or DCM is detected from whether the idle mode is ever entered in the last periods. Periodic steady state is found by Newton shooting on the one-period map, so simulations start settled and a few periods are enough. Efficiency is mean output power over mean input power, and per-element losses are reported.
+Converters live in `pesim.converters`. Buck, boost and buck-boost are switched state space systems with state x = [iL, vC], and each converter has three affine sub circuits: switch on, diode conducting, and inductor idle for DCM. Each sub circuit is discretised exactly with a matrix exponential of the augmented [A b; 0 0] matrix, so the fixed time step only sets how finely the switching instants and the DCM boundary are resolved. Loss elements are MOSFET Rds_on, inductor DCR, diode forward drop and capacitor ESR, and the ESR also produces the correct ripple step. CCM or DCM is detected from whether the idle mode is ever entered in the last periods. Periodic steady state is found by Newton shooting on the one period map, which means simulations start settled and a few periods are enough. Efficiency is mean output power over mean input power, and per element losses are reported.
 
-Design (`pesim.design`). Inductor and capacitor sizing from ripple ratios, CCM boundary load and critical inductance, and averaged CCM small-signal control-to-output models:
+Design lives in `pesim.design`. It covers inductor and capacitor sizing from ripple ratios, the CCM boundary load and critical inductance, and averaged CCM small signal control to output models:
 
 - buck: Gvd = Vin / (1 + sL/R + s^2 LC)
 - boost: Gvd = (Vo/D') (1 - sL/(D'^2 R)) / (1 + sL/(D'^2 R) + s^2 LC/D'^2), right-half-plane zero at D'^2 R / L
 - buck-boost: same denominator, zero at D'^2 R / (D L)
 
-An optional ESR zero (1 + s ESR C) multiplies each. Compensators are designed with the k-factor method: type II (one zero, one pole, integrator), type III (two zeros, two poles, integrator) and a plain PI, each scaled for unity loop gain at the requested crossover, with phase margin and gain margin read back from `control.margin`.
+An optional ESR zero of 1 plus s ESR C multiplies each. Compensators come from the k-factor method: type II with one zero, one pole and an integrator, type III with two of each, and a plain PI. Each is scaled for unity loop gain at the requested crossover, and phase margin and gain margin are read back from `control.margin`. You ask for 60 degrees at 5 kHz and you get it.
 
-Inverter (`pesim.inverter`). Three-phase two-level VSI with pole voltages at plus or minus Vdc/2. SPWM compares sine references with a triangular carrier. SVPWM is implemented as SPWM with min-max zero-sequence injection, which is equivalent to symmetric space vector modulation and extends the linear range from m = 1 to m = 2/sqrt(3). Line-to-line voltages, FFT harmonic spectra and THD are provided. Dead time is not switched in the model; the module docstring explains its effect (a current-sign-dependent voltage error of Vdc td fsw per period, low-order odd harmonics) and `dead_time_voltage_error()` gives the magnitude.
+The inverter in `pesim.inverter` is a three phase two level VSI with pole voltages at plus or minus Vdc/2. SPWM compares sine references with a triangular carrier, and SVPWM is implemented as SPWM with min max zero sequence injection, which is equivalent to symmetric space vector modulation and extends the linear range from m = 1 to m = 2/sqrt(3). Line to line voltages, FFT harmonic spectra and THD are provided. Dead time is not switched in the model. The module docstring explains its effect, a current sign dependent voltage error of Vdc td fsw per period plus low order odd harmonics, and `dead_time_voltage_error()` gives the magnitude.
 
-PFC (`pesim.pfc`). Averaged boost PFC with an inner average-current PI loop (feed-forward duty plus PI) tracking k times the rectified input voltage, and a slow outer voltage loop scaling k. Reports input current THD, power factor and the twice-line-frequency output ripple.
+The PFC in `pesim.pfc` is an averaged boost with an inner average current PI loop, feed forward duty plus PI, tracking k times the rectified input voltage, and a slow outer voltage loop scaling k. It reports input current THD, power factor and the twice line frequency output ripple.
 
-Thermal (`pesim.thermal`). MOSFET conduction loss from Rds_on with a linear temperature coefficient, switching loss from a Miller-charge transition-time estimate, Coss and reverse-recovery losses, gate drive loss, and a self-consistent junction temperature through Rth_jc plus Rth_ca.
+Thermal in `pesim.thermal` builds a MOSFET loss budget from conduction loss with a linear Rds_on temperature coefficient, switching loss from a Miller charge transition time estimate, Coss and reverse recovery losses, and gate drive loss, then solves a self consistent junction temperature through Rth_jc plus Rth_ca.
 
 ## API
 
@@ -51,7 +51,7 @@ from pesim.thermal import MosfetParams, junction_temperature
 | Square wave THD | sqrt(pi^2/8 - 1) = 48.34 % | matches to 0.5 % | test_square_wave_thd |
 | Thermal fixed point | Tj = Ta + P Rth | converged | test_thermal_converges |
 
-Other numbers from `examples/run_all.py`: buck in DCM at 2.5 times the boundary load rises to 6.58 V; lossy boost peaks at 97.9 % efficiency; SPWM line-line utilisation saturates at 0.866 Vdc while SVPWM reaches 1.0 Vdc in the linear range; boost PFC input THD 4.5 % with PF 0.998; example MOSFET at 100 kHz runs at Tj about 47 C.
+Other numbers from `examples/run_all.py`: the buck in DCM at 2.5 times the boundary load rises to 6.58 V, the lossy boost peaks at 97.9 % efficiency, SPWM line to line utilisation saturates at 0.866 Vdc while SVPWM reaches 1.0 Vdc in the linear range, the boost PFC pulls input current at 4.5 % THD with PF 0.998, and the example MOSFET at 100 kHz runs at Tj about 47 C.
 
 ## Figures
 
