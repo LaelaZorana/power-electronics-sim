@@ -1,11 +1,13 @@
 # pesim: switching power converter simulation and design
 
-A buck, a boost, a buck-boost, a three phase inverter, a boost PFC stage and a
+Most converter code hands you a waveform and leaves you to trust it. This is a
+buck, a boost, a buck-boost, a three phase inverter, a boost PFC stage and a
 MOSFET loss and thermal budget, all simulated in plain numpy and scipy with
-python-control handling the loop design. The validation table below lists the
-numbers that are asserted by the test suite and names the test for each one.
-The paragraph after it lists the numbers that come from running
-`examples/run_all.py`, and each of those is also pinned by a test.
+python-control handling the loop design, and the point of the whole thing is
+that you can check it. The validation table below lists the numbers that are
+asserted by the test suite and names the test for each one. The paragraph after
+it lists the numbers that come from running `examples/run_all.py`, and each of
+those is also pinned by a test.
 
 ## Theory summary
 
@@ -13,24 +15,28 @@ Converters live in `pesim.converters`. Buck, boost and buck-boost are switched
 state space systems with state x = [iL, vC], and each converter has three
 affine sub circuits: switch on, diode conducting, and inductor idle for DCM.
 Each sub circuit is discretised exactly with a matrix exponential of the
-augmented `[A b; 0 0]` matrix, so the fixed time step only sets how finely the
-switching instants and the DCM boundary are resolved.
+augmented `[A b; 0 0]` matrix, so the fixed time step doesn't set your accuracy,
+it only sets how finely the switching instants and the DCM boundary are
+resolved.
 
 Loss elements are MOSFET Rds_on, inductor DCR, diode forward drop and
 capacitor ESR, and the ESR also produces the correct ripple step. CCM or DCM
 is detected from whether the idle mode is ever entered in the last periods.
-Periodic steady state is found by Newton shooting on the one period map, which
-means simulations start settled and a few periods are enough. Efficiency is
-mean output power over mean input power, per element losses are reported, and
-the power balance Pin equals Pout plus the sum of losses closes to better than
-0.1 percent, which `test_power_balance` asserts.
+Periodic steady state comes from Newton shooting on the one period map, so
+simulations start settled and a few periods are enough instead of a long startup
+transient you have to sit through. Efficiency is mean output power over mean
+input power, per element losses are reported, and if you add them up the power
+balance Pin equals Pout plus the sum of losses closes to better than 0.1
+percent, which `test_power_balance` asserts.
 
-The duty cycle is realised as an integer number of simulation steps. The
-effective value is stored on the result as `D_eff` and the simulator warns
-when quantisation moves it by more than 1e-3. Specs are validated on
-construction, a duty cycle outside [0, 1) or a nonpositive component value
-raises immediately. The buck-boost output is reported as a positive magnitude,
-the physical output of the inverting topology is negative.
+The duty cycle is realised as an integer number of simulation steps, so you
+don't always get exactly the duty you asked for. The effective value is stored
+on the result as `D_eff` and the simulator warns when quantisation moves it by
+more than 1e-3. Specs are validated on construction, so a duty cycle outside
+[0, 1) or a nonpositive component value raises immediately rather than turning
+into a strange waveform you have to trace back later. The buck-boost is the one
+sign trap. Its output is reported as a positive magnitude, and the physical
+output of the inverting topology is negative.
 
 Design lives in `pesim.design`. It covers inductor and capacitor sizing from
 ripple ratios, the CCM boundary load and critical inductance, and averaged CCM
@@ -44,61 +50,68 @@ An optional ESR zero of 1 plus s ESR C multiplies each. Compensators come from
 the k-factor method: type II with one zero, one pole and an integrator, type
 III with two of each, and a plain PI. Each is scaled for unity loop gain at
 the requested crossover, and phase margin and gain margin are read back from
-`control.margin`. Every design function measures the loop it hands back. It
-raises ValueError when the requested phase boost is beyond what the
-compensator type can supply or when the measured loop is unstable, and it
-warns when the loop has more than one gain crossover or misses the requested
-crossover frequency, so a design that cannot work always says so.
-`test_design_raises_on_unachievable_or_unstable` exercises the failure paths.
+`control.margin`. That readback is the part that matters, because every design
+function measures the loop it hands back rather than trusting the design
+equations that produced it, so it raises ValueError when the requested phase
+boost is beyond what the compensator type can supply or when the measured loop
+is unstable, and it warns when the loop has more than one gain crossover or
+misses the requested crossover frequency. A design that can't work always says
+so. `test_design_raises_on_unachievable_or_unstable` exercises the failure
+paths.
 
 The inverter in `pesim.inverter` is a three phase two level VSI with pole
 voltages at plus or minus Vdc/2. SPWM compares sine references with a
 triangular carrier, and SVPWM is implemented as SPWM with min max zero
 sequence injection, which with a triangular carrier and the resulting equal
 zero vector split is equivalent to symmetric space vector modulation and
-extends the linear range from m = 1 to m = 2/sqrt(3). Line to line voltages,
-FFT harmonic spectra and THD are provided. The THD here counts everything
-above the fundamental including the PWM carrier sidebands, so on a raw PWM
-voltage it is the unfiltered voltage THD. Dead time is not switched in the
-model. The module docstring explains its effect, a current sign dependent
-average voltage error of magnitude Vdc td fsw plus low order odd harmonics,
-and `dead_time_voltage_error()` gives the magnitude.
+extends the linear range from m = 1 to m = 2/sqrt(3). You get line to line
+voltages, FFT harmonic spectra and THD. Read that THD number carefully, because
+it counts everything above the fundamental including the PWM carrier sidebands,
+so on a raw PWM voltage it is the unfiltered voltage THD. Dead time isn't
+switched in the model, which is a real limitation and worth knowing before you
+read anything into the low order harmonics. The module docstring explains its
+effect, a current sign dependent average voltage error of magnitude Vdc td fsw
+plus low order odd harmonics, and `dead_time_voltage_error()` gives the
+magnitude.
 
 The PFC in `pesim.pfc` is an averaged boost with an inner average current PI
 loop, feed forward duty plus PI, tracking k times the rectified input voltage,
 and a slow outer voltage loop scaling k. It reports input current THD, power
-factor and the twice line frequency output ripple. The residual THD at the
-default settings is dominated by the 3rd harmonic that the outer voltage
-loop's proportional gain injects by multiplying the output ripple into the
-current reference. Setting that gain to zero drops the THD below 0.5 percent
-with power factor 1.000 while tripling the current loop gain changes nothing,
-and `test_pfc_thd_mechanism_is_outer_loop_ripple` pins that experiment.
+factor and the twice line frequency output ripple. If the residual THD looks
+like a current loop that needs more gain, it isn't. At the default settings it's
+dominated by the 3rd harmonic that the outer voltage loop's proportional gain
+injects by multiplying the output ripple into the current reference. Set that
+gain to zero and the THD drops below 0.5 percent with power factor 1.000, while
+tripling the current loop gain changes nothing, and
+`test_pfc_thd_mechanism_is_outer_loop_ripple` pins that experiment.
 
 Thermal in `pesim.thermal` builds a MOSFET loss budget from conduction loss
 with a linear Rds_on temperature coefficient, switching loss from a Miller
 charge transition time estimate, Coss and reverse recovery losses, and gate
-drive loss. Because the total loss is affine in Tj the self consistent
-junction temperature has a closed form, and when the thermal feedback gain
-reaches one there is no finite operating point and the solver raises a
-thermal runaway error instead of returning a divergent number, which
-`test_thermal_runaway_raises` checks.
+drive loss. Because the total loss is affine in Tj the self consistent junction
+temperature has a closed form, so it comes out in one solve rather than an
+iteration you have to watch. And when the thermal feedback gain reaches one
+there is no finite operating point at all, so the solver raises a thermal
+runaway error instead of returning a divergent number that would still look like
+a temperature, which `test_thermal_runaway_raises` checks.
 
 ## Device data and designs
 
 `data/devices/` holds parameter files for four power devices, a 650 V
 superjunction MOSFET, a 650 V SiC MOSFET, a 100 V synchronous buck FET and a
 1200 V SiC half bridge module, each with Rds_on versus temperature points,
-switching energy versus current points and thermal resistances. The values
-are representative of their datasheet class, not copies of a specific part,
-see `data/README.md`. `data/designs/` holds four converter design points, a
-48 V to 12 V 300 W buck, a 400 V PV boost, a 3 kW PFC front end and a 10 kW
-EV traction inverter operating point. `pesim.devices` loads both kinds of
-file and interpolates the tables, and `examples/design_comparison.py` designs,
-simulates and compares all four, writing a table of efficiency, ripple and
-loop margins to `examples/design_comparison.md`. Efficiency curves there
-combine conduction loss from the interpolated Rds_on with switching loss from
-the tabulated energies, so they fall at light load where switching dominates
-and at heavy load where conduction grows.
+switching energy versus current points and thermal resistances. The values are
+representative of their datasheet class and aren't copies of a specific part, so
+don't qualify hardware against them, and `data/README.md` says the same thing at
+more length. `data/designs/` holds four converter design points, a 48 V to 12 V
+300 W buck, a 400 V PV boost, a 3 kW PFC front end and a 10 kW EV traction
+inverter operating point. `pesim.devices` loads both kinds of file and
+interpolates the tables, and `examples/design_comparison.py` designs, simulates
+and compares all four, writing a table of efficiency, ripple and loop margins to
+`examples/design_comparison.md`. Efficiency curves there combine conduction loss
+from the interpolated Rds_on with switching loss from the tabulated energies,
+which is why they fall at light load where switching dominates and again at
+heavy load where conduction grows.
 
 ## API
 
@@ -145,12 +158,12 @@ and 1.0 Vdc of line to line fundamental, test_utilisation_linear_limits, and
 the utilisation figure sweeps m only to the SVPWM linear limit of 1.155. The
 boost PFC pulls input current at 4.5 percent THD with PF 0.998,
 test_pfc_baseline_metrics. The example MOSFET at 100 kHz runs at Tj of 47.2 C,
-test_thermal_example_tj. The boost efficiency figure combines the switched
-simulation's conduction losses with switching loss from `mosfet_losses`, so
-the curve peaks near 22 W at 96 percent and falls toward both light load,
-where switching loss dominates, and heavy load, where conduction grows, and
-its power axis comes from the simulated output voltage rather than the ideal
-one.
+test_thermal_example_tj. The boost efficiency figure is the one worth staring
+at, because it combines the switched simulation's conduction losses with
+switching loss from `mosfet_losses`, so the curve peaks near 22 W at 96 percent
+and falls toward both light load, where switching loss dominates, and heavy
+load, where conduction grows, and its power axis comes from the simulated output
+voltage rather than the ideal one.
 
 ## Figures
 
@@ -169,8 +182,9 @@ python examples/run_all.py            # writes figures/ and prints key numbers
 python examples/design_comparison.py  # writes examples/design_comparison.md
 ```
 
-The simulators are plain Python loops, exact per step but not vectorised. The
-whole suite runs in about one second.
+The simulators are plain Python loops, exact per step but not vectorised, which
+you'd expect to hurt and doesn't much at this size. The whole suite runs in
+about one second.
 
 ## License
 

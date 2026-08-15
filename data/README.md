@@ -7,10 +7,10 @@ temperature points, total switching energy Eon plus Eoff versus drain current
 points at a stated reference voltage, gate and output charge figures, and the
 junction to case and case to ambient thermal resistances.
 
-The numbers are representative of their datasheet class and are not copied
-from any specific manufacturer part. They sit at typical values for the class
-so that loss and efficiency calculations come out realistic, but they should
-not be used to qualify hardware.
+These aren't datasheet extracts. The numbers are representative of their
+datasheet class and are not copied from any specific manufacturer part, and they
+sit at typical values for the class so that loss and efficiency calculations
+come out realistic. Don't use them to qualify hardware.
 
 | File | Class |
 |---|---|
@@ -35,7 +35,7 @@ Four converter design points in YAML, each naming one of the devices above.
 | pfc-3kw-frontend.yaml | 3 kW totem pole PFC style front end, run through the averaged boost PFC model |
 | inverter-ev-10kw.yaml | 10 kW EV traction inverter operating point, 800 V bus |
 
-`pesim.devices.load_design` reads one file. `examples/design_comparison.py`
+`pesim.devices.load_design` reads one file, and `examples/design_comparison.py`
 loads all four, sizes and designs each converter, simulates it, and writes a
 comparison table of efficiency, ripple and loop margins to
 `examples/design_comparison.md`.
