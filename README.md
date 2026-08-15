@@ -13,7 +13,7 @@ Converters live in `pesim.converters`. Buck, boost and buck-boost are switched
 state space systems with state x = [iL, vC], and each converter has three
 affine sub circuits: switch on, diode conducting, and inductor idle for DCM.
 Each sub circuit is discretised exactly with a matrix exponential of the
-augmented [A b; 0 0] matrix, so the fixed time step only sets how finely the
+augmented `[A b; 0 0]` matrix, so the fixed time step only sets how finely the
 switching instants and the DCM boundary are resolved.
 
 Loss elements are MOSFET Rds_on, inductor DCR, diode forward drop and
@@ -48,7 +48,7 @@ the requested crossover, and phase margin and gain margin are read back from
 raises ValueError when the requested phase boost is beyond what the
 compensator type can supply or when the measured loop is unstable, and it
 warns when the loop has more than one gain crossover or misses the requested
-crossover frequency, so a design that cannot work never comes back silently.
+crossover frequency, so a design that cannot work always says so.
 `test_design_raises_on_unachievable_or_unstable` exercises the failure paths.
 
 The inverter in `pesim.inverter` is a three phase two level VSI with pole
