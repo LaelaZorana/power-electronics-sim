@@ -1,17 +1,21 @@
 # pesim: switching power converter simulation and design
 
-Most converter code hands you a waveform and leaves you to trust it. This is a
-buck, a boost, a buck-boost, a three phase inverter, a boost PFC stage and a
-MOSFET loss and thermal budget, all simulated in plain numpy and scipy with
-python-control handling the loop design, and the point of the whole thing is
-that you can check it. The validation table below lists the numbers that are
-asserted by the test suite and names the test for each one. The paragraph after
-it lists the numbers that come from running `examples/run_all.py`, and each of
-those is also pinned by a test.
+Every number in this README has a test name printed beside it, and you can go
+run that test yourself. Working that way meant giving up the usual shortcuts, so
+the buck, the boost, the buck-boost, the three phase inverter, the boost PFC
+stage and the MOSFET loss and thermal budget are all simulated in plain numpy
+and scipy with python-control handling the loop design. No SPICE netlist, no
+solver binary you can't see into. The whole package is under a thousand lines
+of Python, which is the only reason the closed form comparisons below mean
+anything, because you can read the model that produced each simulated column
+and decide for yourself whether the agreement is real. The validation table
+below lists the numbers that are asserted by the test suite and names the test
+for each one. The paragraph after it lists the numbers that come from running
+`examples/run_all.py`, and each of those is also pinned by a test.
 
 ## Theory summary
 
-Converters live in `pesim.converters`. Buck, boost and buck-boost are switched
+Buck, boost and buck-boost all live in `pesim.converters` as switched
 state space systems with state x = [iL, vC], and each converter has three
 affine sub circuits: switch on, diode conducting, and inductor idle for DCM.
 Each sub circuit is discretised exactly with a matrix exponential of the
@@ -38,9 +42,10 @@ into a strange waveform you have to trace back later. The buck-boost is the one
 sign trap. Its output is reported as a positive magnitude, and the physical
 output of the inverting topology is negative.
 
-Design lives in `pesim.design`. It covers inductor and capacitor sizing from
-ripple ratios, the CCM boundary load and critical inductance, and averaged CCM
-small signal control to output models:
+Once you know what a converter does you still have to size it, and that part is
+`pesim.design`: inductor and capacitor sizing from ripple ratios, the CCM
+boundary load and critical inductance, and averaged CCM small signal control to
+output models:
 
 - buck: Gvd = Vin / (1 + sL/R + s^2 LC)
 - boost: Gvd = (Vo/D') (1 - sL/(D'^2 R)) / (1 + sL/(D'^2 R) + s^2 LC/D'^2), right half plane zero at D'^2 R / L
@@ -59,7 +64,7 @@ misses the requested crossover frequency. A design that can't work always says
 so. `test_design_raises_on_unachievable_or_unstable` exercises the failure
 paths.
 
-The inverter in `pesim.inverter` is a three phase two level VSI with pole
+Step up to three phase and you're in `pesim.inverter`, a two level VSI with pole
 voltages at plus or minus Vdc/2. SPWM compares sine references with a
 triangular carrier, and SVPWM is implemented as SPWM with min max zero
 sequence injection, which with a triangular carrier and the resulting equal
@@ -74,21 +79,22 @@ effect, a current sign dependent average voltage error of magnitude Vdc td fsw
 plus low order odd harmonics, and `dead_time_voltage_error()` gives the
 magnitude.
 
-The PFC in `pesim.pfc` is an averaged boost with an inner average current PI
-loop, feed forward duty plus PI, tracking k times the rectified input voltage,
-and a slow outer voltage loop scaling k. It reports input current THD, power
-factor and the twice line frequency output ripple. If the residual THD looks
-like a current loop that needs more gain, it isn't. At the default settings it's
+Back at the wall socket, `pesim.pfc` models an averaged boost with an inner
+average current PI loop, feed forward duty plus PI, tracking k times the
+rectified input voltage, and a slow outer voltage loop scaling k. It reports
+input current THD, power factor and the twice line frequency output ripple. If
+the residual THD looks like a current loop that needs more gain, it isn't. At
+the default settings it's
 dominated by the 3rd harmonic that the outer voltage loop's proportional gain
 injects by multiplying the output ripple into the current reference. Set that
 gain to zero and the THD drops below 0.5 percent with power factor 1.000, while
 tripling the current loop gain changes nothing, and
 `test_pfc_thd_mechanism_is_outer_loop_ripple` pins that experiment.
 
-Thermal in `pesim.thermal` builds a MOSFET loss budget from conduction loss
-with a linear Rds_on temperature coefficient, switching loss from a Miller
-charge transition time estimate, Coss and reverse recovery losses, and gate
-drive loss. Because the total loss is affine in Tj the self consistent junction
+Whatever you switch has to get rid of its heat, so `pesim.thermal` builds a
+MOSFET loss budget from conduction loss with a linear Rds_on temperature
+coefficient, switching loss from a Miller charge transition time estimate, Coss
+and reverse recovery losses, and gate drive loss. Because the total loss is affine in Tj the self consistent junction
 temperature has a closed form, so it comes out in one solve rather than an
 iteration you have to watch. And when the thermal feedback gain reaches one
 there is no finite operating point at all, so the solver raises a thermal
@@ -152,13 +158,15 @@ from pesim.devices import load_all_devices, load_design, efficiency_curve
 | Thermal closed form Tj | 48.069 C by hand | exact | test_thermal_self_consistent_pinned |
 
 Other numbers printed by `examples/run_all.py`, each pinned by the named
-test: the buck in DCM at 2.5 times the boundary load rises to 6.58 V,
-test_buck_dcm_example_voltage. The SPWM and SVPWM linear ranges end at 0.866
-and 1.0 Vdc of line to line fundamental, test_utilisation_linear_limits, and
-the utilisation figure sweeps m only to the SVPWM linear limit of 1.155. The
-boost PFC pulls input current at 4.5 percent THD with PF 0.998,
-test_pfc_baseline_metrics. The example MOSFET at 100 kHz runs at Tj of 47.2 C,
-test_thermal_example_tj. The boost efficiency figure is the one worth staring
+test: push the buck into DCM at 2.5 times the boundary load and the output
+rises to 6.58 V, which is what test_buck_dcm_example_voltage holds it to.
+Modulation comes next, where the SPWM and SVPWM linear ranges end at 0.866
+and 1.0 Vdc of line to line fundamental under test_utilisation_linear_limits,
+which is also why the utilisation figure sweeps m only to the SVPWM linear
+limit of 1.155. Down at the front end the boost PFC pulls input current at 4.5
+percent THD with PF 0.998 and test_pfc_baseline_metrics pins both, while the
+example MOSFET at 100 kHz runs at Tj of 47.2 C, test_thermal_example_tj. None
+of those are eyeballed. The boost efficiency figure is the one worth staring
 at, because it combines the switched simulation's conduction losses with
 switching loss from `mosfet_losses`, so the curve peaks near 22 W at 96 percent
 and falls toward both light load, where switching loss dominates, and heavy
