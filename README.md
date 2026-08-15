@@ -1,7 +1,8 @@
 # pesim: switching power converter simulation and design
 
-Every number in this README has a test name printed beside it, and you can go
-run that test yourself. Working that way meant giving up the usual shortcuts, so
+A buck running from 12 V at 40 percent duty should sit at 4.8 V, and the whole
+package is built around putting numbers you can work out by hand next to the ones
+the simulator produced. Working that way meant giving up the usual shortcuts, so
 the buck, the boost, the buck-boost, the three phase inverter, the boost PFC
 stage and the MOSFET loss and thermal budget are all simulated in plain numpy
 and scipy with python-control handling the loop design. No SPICE netlist, no
