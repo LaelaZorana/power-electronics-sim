@@ -6,12 +6,13 @@ the buck, the boost, the buck-boost, the three phase inverter, the boost PFC
 stage and the MOSFET loss and thermal budget are all simulated in plain numpy
 and scipy with python-control handling the loop design. No SPICE netlist, no
 solver binary you can't see into. The whole package is under a thousand lines
-of Python, which is the only reason the closed form comparisons below mean
-anything, because you can read the model that produced each simulated column
-and decide for yourself whether the agreement is real. The validation table
-below lists the numbers that are asserted by the test suite and names the test
-for each one. The paragraph after it lists the numbers that come from running
-`examples/run_all.py`, and each of those is also pinned by a test.
+of Python, so you can read the model that produced each simulated column and
+decide for yourself whether the agreement is real, and the comparisons below
+mean something because the closed form references are worked out independently
+of the code they check. The validation table below lists the numbers that are
+asserted by the test suite and names the test for each one. The paragraph after
+it lists the numbers that come from running `examples/run_all.py`, and each of
+those is also pinned by a test.
 
 ## Theory summary
 
@@ -42,10 +43,9 @@ into a strange waveform you have to trace back later. The buck-boost is the one
 sign trap. Its output is reported as a positive magnitude, and the physical
 output of the inverting topology is negative.
 
-Once you know what a converter does you still have to size it, and that part is
-`pesim.design`: inductor and capacitor sizing from ripple ratios, the CCM
-boundary load and critical inductance, and averaged CCM small signal control to
-output models:
+The sizing and loop design live in `pesim.design`: inductor and capacitor
+sizing from ripple ratios, the CCM boundary load and critical inductance, and
+averaged CCM small signal control to output models:
 
 - buck: Gvd = Vin / (1 + sL/R + s^2 LC)
 - boost: Gvd = (Vo/D') (1 - sL/(D'^2 R)) / (1 + sL/(D'^2 R) + s^2 LC/D'^2), right half plane zero at D'^2 R / L
@@ -60,16 +60,15 @@ function measures the loop it hands back rather than trusting the design
 equations that produced it, so it raises ValueError when the requested phase
 boost is beyond what the compensator type can supply or when the measured loop
 is unstable, and it warns when the loop has more than one gain crossover or
-misses the requested crossover frequency. A design that can't work always says
-so. `test_design_raises_on_unachievable_or_unstable` exercises the failure
-paths.
+misses the requested crossover frequency.
+`test_design_raises_on_unachievable_or_unstable` exercises the failure paths.
 
-Step up to three phase and you're in `pesim.inverter`, a two level VSI with pole
-voltages at plus or minus Vdc/2. SPWM compares sine references with a
-triangular carrier, and SVPWM is implemented as SPWM with min max zero
-sequence injection, which with a triangular carrier and the resulting equal
-zero vector split is equivalent to symmetric space vector modulation and
-extends the linear range from m = 1 to m = 2/sqrt(3). You get line to line
+`pesim.inverter` is a two level VSI with pole voltages at plus or minus Vdc/2.
+SPWM compares sine references with a triangular carrier, and SVPWM is
+implemented as SPWM with min max zero sequence injection, which with a
+triangular carrier and the resulting equal zero vector split is equivalent to
+symmetric space vector modulation and extends the linear range from m = 1 to
+m = 2/sqrt(3). You get line to line
 voltages, FFT harmonic spectra and THD. Read that THD number carefully, because
 it counts everything above the fundamental including the PWM carrier sidebands,
 so on a raw PWM voltage it is the unfiltered voltage THD. Dead time isn't
